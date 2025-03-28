@@ -25,7 +25,6 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new Get(),
         new GetCollection(),
         new Post(security: "is_granted('ROLE_USER')"),
-        new Delete(security: "is_granted('ROLE_USER')"),
     ],
     normalizationContext: ['groups' => ['posting:read']],
     denormalizationContext: ['groups' => ['posting:write']],

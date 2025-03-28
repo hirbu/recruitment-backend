@@ -15,6 +15,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ApiResource(
+    operations: [],
     normalizationContext: ['groups' => ['user:read', 'user:postings']],
 )]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
