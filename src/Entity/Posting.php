@@ -2,7 +2,13 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
 use App\Enum\ExperienceLevel;
 use App\Enum\JobType;
 use App\Repository\PostingRepository;
@@ -15,9 +21,27 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: PostingRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(security: "is_granted('ROLE_USER')"),
+        new Delete(security: "is_granted('ROLE_USER')"),
+    ],
     normalizationContext: ['groups' => ['posting:read']],
-    denormalizationContext: ['groups' => ['posting:write']]
+    denormalizationContext: ['groups' => ['posting:write']],
+    order: ['createdAt' => 'DESC'],
+    paginationClientEnabled: false,
+    paginationClientItemsPerPage: false,
+    paginationEnabled: true,
+    paginationItemsPerPage: 10
 )]
+#[ApiFilter(SearchFilter::class, properties: [
+    'title' => 'iword_start',
+    'jobType' => 'exact',
+    'experienceLevel' => 'exact',
+    'cities.id' => 'exact',
+    'owner.id' => 'exact',
+])]
 class Posting
 {
     #[ORM\Id]
@@ -60,6 +84,12 @@ class Posting
     #[Groups(['posting:read', 'posting:write'])]
     private Collection $tags;
 
+    /**
+     * @var Collection<int, Application>
+     */
+    #[ORM\OneToMany(targetEntity: Application::class, mappedBy: 'posting', orphanRemoval: true)]
+    private Collection $applications;
+
     #[ORM\Column]
     #[Groups(['posting:read'])]
     private ?\DateTimeImmutable $createdAt = null;
@@ -68,10 +98,16 @@ class Posting
     #[Groups(['posting:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    #[ORM\ManyToOne(inversedBy: 'postings')]
+    #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['posting:read', 'posting:write'])]
+    private ?User $owner = null;
+
     public function __construct()
     {
         $this->cities = new ArrayCollection();
         $this->tags = new ArrayCollection();
+        $this->applications = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -183,6 +219,28 @@ class Posting
         return $this;
     }
 
+    /**
+     * @return Collection<int, Application>
+     */
+    public function getApplications(): Collection
+    {
+        return $this->applications;
+    }
+
+    public function addApplication(Application $application): static
+    {
+        $this->applications->add($application);
+
+        return $this;
+    }
+
+    public function removeApplication(Application $application): static
+    {
+        $this->applications->removeElement($application);
+
+        return $this;
+    }
+
     public function getCreatedAt(): ?\DateTimeImmutable
     {
         return $this->createdAt;
@@ -203,6 +261,18 @@ class Posting
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getOwner(): ?User
+    {
+        return $this->owner;
+    }
+
+    public function setOwner(?User $owner): static
+    {
+        $this->owner = $owner;
 
         return $this;
     }

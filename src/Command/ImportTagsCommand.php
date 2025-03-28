@@ -2,7 +2,7 @@
 
 namespace App\Command;
 
-use App\Entity\City;
+use App\Entity\Tag;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -14,10 +14,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * @codeCoverageIgnore
  */
 #[AsCommand(
-    name: 'app:import-cities',
-    description: 'Imports cities from JSON file into the database',
+    name: 'app:import-tags',
+    description: 'Imports tags from JSON file into the database',
 )]
-class ImportCitiesCommand extends Command
+class ImportTagsCommand extends Command
 {
     public function __construct(
         private readonly string                 $path,
@@ -31,29 +31,29 @@ class ImportCitiesCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $io->title('Starting city import');
+        $io->title('Starting tag import');
 
         $jsonFilePath = $this->path;
 
         if (!file_exists($jsonFilePath)) {
-            $io->error('Cities JSON file not found!');
+            $io->error('Tags JSON file not found!');
             return Command::FAILURE;
         }
 
-        $citiesData = json_decode(file_get_contents($jsonFilePath), true);
+        $tagsData = array_unique(json_decode(file_get_contents($jsonFilePath), true));
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             $io->error('Invalid JSON format: ' . json_last_error_msg());
             return Command::FAILURE;
         }
 
-        $io->progressStart($count = count($citiesData));
+        $io->progressStart($count = count($tagsData));
 
-        foreach ($citiesData as $index => $cityData) {
-            $city = new City();
-            $city->setName($cityData);
+        foreach ($tagsData as $index => $tagData) {
+            $tag = new Tag();
+            $tag->setName($tagData);
 
-            $this->entityManager->persist($city);
+            $this->entityManager->persist($tag);
 
             $io->progressAdvance();
 
@@ -66,7 +66,7 @@ class ImportCitiesCommand extends Command
 
         $this->entityManager->flush();
 
-        $io->success("Successfully imported {$count} new cities!");
+        $io->success("Successfully imported {$count} new tags!");
         return Command::SUCCESS;
     }
 }
