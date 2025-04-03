@@ -23,11 +23,8 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
 
-          mkdir -p /var/www/recruitment-backend
-
           cd /var/www/recruitment-backend
           
-          git clone https://github.com/hirbu/recruitment-backend.git .
           git config --global --add safe.directory /var/www/recruitment-backend
           git fetch origin
           git reset --hard origin/master
