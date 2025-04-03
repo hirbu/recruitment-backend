@@ -35,5 +35,5 @@ jobs:
 
           sudo php bin/console cache:clear
 
-          sudo systemctl restart nginx.status
+          sudo systemctl restart nginx.service
           EOF
