@@ -31,8 +31,17 @@ jobs:
         git reset --hard origin/master
         
         # Ensure proper permissions
-        sudo chown -R $USER:$USER /var/www/recruitment-backend
+        sudo chown -R www-data:www-data /var/www/recruitment-backend
         sudo chmod -R 755 /var/www/recruitment-backend
+        
+        # Ensure proper permissions for uploads
+        mkdir -p /var/www/recruitment-backend/public/uploads/resumes
+        sudo chown -R www-data:www-data /var/www/recruitment-backend/public/uploads/resumes
+        sudo chmod -R 770 /var/www/recruitment-backend/public/uploads/resumes
+        
+        # Ensure cache and logs are writable
+        sudo chown -R www-data:www-data /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
+        sudo chmod -R 775 /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
         
         # Install dependencies
         composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
@@ -46,4 +55,7 @@ jobs:
         
         # Restart nginx
         sudo systemctl restart nginx
+        
+        # Restart workers
+        sudo systemctl --user restart messenger-consume@*.service
         EOF

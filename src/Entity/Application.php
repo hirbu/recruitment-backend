@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Post;
 use App\Repository\ApplicationRepository;
 use Doctrine\DBAL\Types\Types;
@@ -14,7 +13,6 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\HasLifecycleCallbacks]
 #[ApiResource(
     operations: [
-        new Get(),
         new Post()
     ],
     normalizationContext: ['groups' => ['application:read']],
@@ -36,13 +34,9 @@ class Application
     #[Groups(['application:read', 'application:write'])]
     private ?Resume $resume = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
     #[Groups(['application:read', 'application:write'])]
     private ?string $fields = null;
-
-    #[ORM\Column(nullable: true)]
-    #[Groups(['application:read'])]
-    private ?int $score = null;
 
     #[ORM\ManyToOne(inversedBy: 'applications')]
     #[ORM\JoinColumn(nullable: false)]
@@ -95,18 +89,6 @@ class Application
     public function setFields(string $fields): static
     {
         $this->fields = $fields;
-
-        return $this;
-    }
-
-    public function getScore(): ?int
-    {
-        return $this->score;
-    }
-
-    public function setScore(?int $score): static
-    {
-        $this->score = $score;
 
         return $this;
     }

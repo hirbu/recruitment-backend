@@ -16,18 +16,4 @@ class ApplicationRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Application::class);
     }
-
-    /**
-     * Get applications for a posting ordered by score
-     *
-     * @param Posting $posting
-     * @return array
-     */
-    public function findByPostingOrderedByScore(Posting $posting): array
-    {
-        return $this->findBy(
-            ['posting' => $posting],
-            ['score' => 'DESC']
-        );
-    }
 }

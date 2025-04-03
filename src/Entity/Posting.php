@@ -5,7 +5,6 @@ namespace App\Entity;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
@@ -57,7 +56,7 @@ class Posting
     #[Groups(['posting:read', 'posting:write'])]
     private ?string $description = null;
 
-    #[ORM\Column(type: Types::TEXT)]
+    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
     #[Groups(['posting:read', 'posting:write'])]
     private ?string $fields = null;
 

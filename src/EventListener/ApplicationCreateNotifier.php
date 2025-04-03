@@ -3,42 +3,28 @@
 namespace App\EventListener;
 
 use App\Entity\Application;
-use App\Service\PdfScorerService;
-use App\Service\ResumeService;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Event\PostPersistEventArgs;
+use App\Message\ProcessApplicationMessage;
+use App\Message\ProcessResumeMessage;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsEntityListener;
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Events;
-use Exception;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 #[AsEntityListener(event: Events::postPersist, method: 'postPersist', entity: Application::class)]
-class ApplicationCreateNotifier
+final class ApplicationCreateNotifier
 {
     public function __construct(
-        private readonly ResumeService          $resumeService,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly MessageBusInterface $bus,
     )
     {
     }
 
     public function postPersist(Application $application, PostPersistEventArgs $args): void
     {
-        $this->processApplication($application);
-    }
+        $this->bus->dispatch(new ProcessApplicationMessage($application->getId()));
 
-    /**
-     * Process the application by scoring the resume and updating the score
-     */
-    private function processApplication(Application $application): void
-    {
         $resume = $application->getResume();
-        $posting = $application->getPosting();
-        $tags = $posting->getTags()->map(fn($tag) => $tag->getName())->toArray();
-        
-        $score = $this->resumeService->scoreResume($resume, $tags);
-        $application->setScore($score);
 
-        $this->entityManager->persist($application);
-        $this->entityManager->flush();
+        $this->bus->dispatch(new ProcessResumeMessage($resume->getId()));
     }
 }

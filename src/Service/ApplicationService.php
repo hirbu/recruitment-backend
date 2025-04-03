@@ -2,25 +2,50 @@
 
 namespace App\Service;
 
+use App\Entity\Application;
 use App\Entity\Posting;
-use App\Repository\ApplicationRepository;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ApplicationService
 {
     public function __construct(
-        private readonly ApplicationRepository $applicationRepository,
+        private readonly HttpClientInterface $httpClient,
+
+        private readonly string              $emailKey,
+        private readonly string              $emailUrl,
+        private readonly string              $emailTo,
     )
     {
     }
 
-    /**
-     * Get applications for a posting ordered by score
-     *
-     * @param Posting $posting
-     * @return array
-     */
     public function getApplicationsByPosting(Posting $posting): array
     {
-        return $this->applicationRepository->findByPostingOrderedByScore($posting);
+        return $posting->getApplications()->toArray();
+    }
+
+    public function sendEmail(Application $application): void
+    {
+        $this->httpClient->request('POST', $this->emailUrl, [
+            'headers' => $this->getEmailHeaders(),
+            'json' => $this->getEmailContent($application),
+        ]);
+    }
+
+    private function getEmailHeaders(): array
+    {
+        return [
+            'x-api-key' => $this->emailKey,
+        ];
+    }
+
+    private function getEmailContent(Application $application): array
+    {
+        $posting = $application->getPosting();
+
+        return [
+            'to' => $this->emailTo,
+            'subject' => "{$application->getName()} just applied to the Posting #{$posting->getId()}",
+            'content' => "That's just about it.",
+        ];
     }
 }

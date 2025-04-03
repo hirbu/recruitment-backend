@@ -7,21 +7,22 @@ use App\Repository\ResumeRepository;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ResumeService
 {
     private int $maximumFileSizeBytes;
 
     public function __construct(
-        private readonly ResumeRepository $resumeRepository,
-        private readonly string           $targetDirectory,
-        private readonly string           $maximumFileSizeMega,
-        private readonly array            $allowedMimeTypes,
-        private readonly string           $pythonScriptPath
+        private readonly ResumeRepository    $resumeRepository,
+        private readonly HttpClientInterface $httpClient,
+
+        private readonly string              $targetDirectory,
+        private readonly string              $maximumFileSizeMega,
+        private readonly array               $allowedMimeTypes,
+        private readonly string              $openAIURL,
+        private readonly string              $openAIKey,
     )
     {
         $this->maximumFileSizeBytes = (int)$this->maximumFileSizeMega * 1024 * 1024;
@@ -50,13 +51,15 @@ class ResumeService
     }
 
     /**
-     * Score the Resume
+     * Parse the Resume
      */
-    public function scoreResume(Resume $resume, array $tags): int
+    public function parseResume(Resume $resume): string
     {
-        $file = $this->getFile($resume);
+        $analysisRaw = $this->analyzeResumeUsingOpenAI($resume);
 
-        return $this->callScript($file, $tags);
+        $analysis = json_decode($analysisRaw, true);
+
+        return $analysis['output'][0]['content'][0]['text'];
     }
 
     /**
@@ -144,54 +147,167 @@ class ResumeService
     }
 
     /**
-     * Call the Python script to score the Resume
-     * 
-     * @codeCoverageIgnore
+     * Converts the Resume PDF file to base64
      */
-    protected function callScript(File $file, array $tags): int
+    private function resumePDFToBase64(Resume $resume): string
     {
-        $command = $this->buildScriptCommand($file, $tags);
-        
-        $process = $this->createProcess($command);
-        $this->runProcess($process);
+        $file = $this->getFile($resume);
 
-        if (!$process->isSuccessful()) {
-            throw new ProcessFailedException($process);
-        }
+        $content = $file->getContent();
 
-        return (int) $process->getOutput();
+        return base64_encode($content);
     }
-    
-    /**
-     * Build the script command
-     * 
-     * @codeCoverageIgnore
-     */
-    protected function buildScriptCommand(File $file, array $tags): array
+
+    private function analyzeResumeUsingOpenAI(Resume $resume): string
     {
-        return array_merge(
-            ['python3', $this->pythonScriptPath, $file->getPathname()],
-            $tags
-        );
+        $response = $this->httpClient->request('POST', $this->openAIURL, [
+            'headers' => $this->getResumeOpenAIHeaders(),
+            'json' => $this->getResumeOpenAIRequest($resume),
+        ]);
+
+        return $response->getContent();
     }
-    
+
     /**
-     * Create Process instance
-     * 
-     * @codeCoverageIgnore
+     * Returns the OpenAI request for a given Resume
      */
-    protected function createProcess(array $command): Process
+    private function getResumeOpenAIRequest(Resume $resume): array
     {
-        return new Process($command);
+        return [
+            'model' => 'gpt-4o-mini',
+            'input' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'input_file',
+                            'filename' => 'resume.pdf',
+                            'file_data' => "data:application/pdf;base64,{$this->resumePDFToBase64($resume)}"
+                        ],
+                        [
+                            'type' => 'input_text',
+                            'text' => "You are an expert at structured data extraction from resumes. 
+                                       You will be given unstructured resume and should convert it into the given structure. 
+                                       Leave fields empty if you cannot find the information."
+                        ]
+                    ]
+                ]
+            ],
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'resume_info',
+                    'schema' => $this->getResumeSchema(),
+                    'strict' => true
+                ]
+            ]
+        ];
     }
-    
+
     /**
-     * Run the Process
-     * 
-     * @codeCoverageIgnore
+     * Defines the schema for the Resume analysis
      */
-    protected function runProcess(Process $process): void
+    private function getResumeSchema(): array
     {
-        $process->run();
+        return [
+            'type' => 'object',
+            'properties' => [
+                'email' => [
+                    'type' => 'string',
+                    'description' => 'Candidate\'s email address'
+                ],
+                'phone' => [
+                    'type' => 'string',
+                    'description' => 'Candidate\'s phone number'
+                ],
+                'linkedin' => [
+                    'type' => 'string',
+                    'description' => 'URL to LinkedIn profile'
+                ],
+                'github' => [
+                    'type' => 'string',
+                    'description' => 'URL to GitHub profile'
+                ],
+                'website' => [
+                    'type' => 'string',
+                    'description' => 'URL to personal website or portfolio'
+                ],
+                'skills' => [
+                    'type' => 'array',
+                    'description' => 'List of skills',
+                    'items' => [
+                        'type' => 'string'
+                    ]
+                ],
+                'experience' => [
+                    'type' => 'array',
+                    'description' => 'Work experience of the candidate',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'company' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'location' => ['type' => 'string'],
+                            'description' => [
+                                'type' => 'string',
+                                'description' => 'Key responsibilities and achievements. Summarize it all in 100 words.'
+                            ],
+                            'start_date' => [
+                                'type' => 'string',
+                                'description' => 'Format YYYY-MM or Month YYYY'
+                            ],
+                            'end_date' => [
+                                'type' => 'string',
+                                'description' => 'Format YYYY-MM or Month YYYY or \'Present\' if the candidate is currently working there'
+                            ]
+                        ],
+                        'required' => ['company', 'title', 'location', 'description', 'start_date', 'end_date'],
+                        'additionalProperties' => false
+                    ]
+                ],
+                'education' => [
+                    'type' => 'array',
+                    'description' => 'Educational background of the candidate',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'school' => ['type' => 'string'],
+                            'degree' => [
+                                'type' => 'string',
+                                'description' => 'Degree and field of study'
+                            ],
+                            'location' => ['type' => 'string'],
+                            'start_date' => [
+                                'type' => 'string',
+                                'description' => 'Format YYYY or Month YYYY'
+                            ],
+                            'end_date' => [
+                                'type' => 'string',
+                                'description' => 'Format YYYY or Month YYYY'
+                            ]
+                        ],
+                        'required' => ['school', 'degree', 'location', 'start_date', 'end_date'],
+                        'additionalProperties' => false
+                    ]
+                ],
+                'other' => [
+                    'type' => 'string',
+                    'description' => 'Any other relevant information like projects, certifications, etc. Summarize it all in 200 words.'
+                ]
+            ],
+            'required' => ['email', 'phone', 'linkedin', 'github', 'website', 'skills', 'experience', 'education', 'other'],
+            'additionalProperties' => false
+        ];
+    }
+
+    /**
+     * Returns the OpenAI headers for a given Resume
+     */
+    private function getResumeOpenAIHeaders(): array
+    {
+        return [
+            "Content-Type: application/json",
+            "Authorization: Bearer " . $this->openAIKey,
+        ];
     }
 }

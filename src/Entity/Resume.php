@@ -23,6 +23,10 @@ class Resume
     #[ORM\Column(type: Types::TEXT)]
     private ?string $path = null;
 
+    #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
+    #[Groups(['application:read'])]
+    private ?string $extra = null;
+
     #[ORM\OneToOne(mappedBy: 'resume', cascade: ['persist', 'remove'])]
     private ?Application $application = null;
 
@@ -39,6 +43,18 @@ class Resume
     public function setPath(string $path): static
     {
         $this->path = $path;
+
+        return $this;
+    }
+
+    public function getExtra(): ?string
+    {
+        return $this->extra;
+    }
+
+    public function setExtra(string $extra): static
+    {
+        $this->extra = $extra;
 
         return $this;
     }

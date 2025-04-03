@@ -37,4 +37,11 @@ services:
       $maximumFileSizeMega: 10,
       $allowedMimeTypes:
         - "application/pdf"
-      $pythonScriptPath: "%kernel.project_dir%/scripts/pdf_scorer.py"
+      $openAIURL: '%env(OPEN_AI_URL)%'
+      $openAIKey: '%env(OPEN_AI_KEY)%'
+
+  App\Service\ApplicationService:
+    arguments:
+      $emailKey: '%env(EMAIL_KEY)%'
+      $emailUrl: '%env(EMAIL_URL)%'
+      $emailTo: '%env(EMAIL_TO)%'
