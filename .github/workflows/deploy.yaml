@@ -30,23 +30,10 @@ jobs:
           git reset --hard origin/master
 
           composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+          
+          php bin/console doctrine:migrations:migrate --no-interaction
 
-          mkdir -p var/cache var/log public/uploads/resumes
+          php bin/console cache:clear
 
-          find . -type f -exec chmod 644 {} \;
-          find . -type d -exec chmod 755 {} \;
-
-          chmod 755 bin/console
-
-          HTTPDUSER="www-data"
-
-          setfacl -dR -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX var
-          setfacl -R -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX var
-
-          setfacl -dR -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX public/uploads/resumes
-          setfacl -R -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX public/uploads/resumes
-
-          php bin/console cache:warmup --env=prod
-
-          sudo systemctl restart nginx
+          sudo systemctl restart nginx.status
           EOF
