@@ -9,54 +9,43 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install SSH key
-      uses: webfactory/ssh-agent@v0.7.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Add known hosts
-      run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      - name: Add known hosts
+        run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Run deployment commands
-      run: |
-        ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
-        sudo chown -R $USER:$USER /var/www/recruitment-backend
-        sudo chmod -R 777 /var/www/recruitment-backend
-        
-        cd /var/www/recruitment-backend
-        
-        # Fix git ownership issue
-        git config --global --add safe.directory /var/www/recruitment-backend
-        
-        # Pull latest changes
-        git fetch origin
-        git reset --hard origin/master
-        
-        # Install dependencies
-        composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
-        
-        # Clear cache
-        php bin/console cache:clear
-        php bin/console cache:warmup
-        
-        # Run migrations
-        php bin/console doctrine:migrations:migrate --no-interaction
-        
-        # Restart nginx
-        sudo systemctl restart nginx
-        
-          # Ensure proper permissions
-        sudo chown -R www-data:www-data /var/www/recruitment-backend
-        sudo chmod -R 755 /var/www/recruitment-backend
-        
-        # Ensure proper permissions for uploads
-        mkdir -p /var/www/recruitment-backend/public/uploads/resumes
-        sudo chown -R www-data:www-data /var/www/recruitment-backend/public/uploads/resumes
-        sudo chmod -R 770 /var/www/recruitment-backend/public/uploads/resumes
-        
-        # Ensure cache and logs are writable
-        sudo chown -R www-data:www-data /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
-        sudo chmod -R 775 /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
-        EOF
+      - name: Run deployment commands
+        run: |
+          ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
+          
+          sudo chown -R www-data:www-data /var/www/recruitment-backend
+          sudo find /var/www/recruitment-backend -type d -exec chmod 755 {} \;
+          sudo find /var/www/recruitment-backend -type f -exec chmod 644 {} \;
+          
+          cd /var/www/recruitment-backend
+          
+          git config --global --add safe.directory /var/www/recruitment-backend
+          git fetch origin
+          git reset --hard origin/master
+          
+          composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+          
+          mkdir -p var/cache var/log public/uploads/resumes
+          find var/cache var/log -type d -exec chmod 775 {} \;
+          find var/cache var/log -type f -exec chmod 664 {} \;
+          chmod -R 775 public/uploads
+          
+          sudo -u www-data php bin/console cache:clear
+          sudo -u www-data php bin/console cache:warmup
+          sudo -u www-data php bin/console doctrine:migrations:migrate --no-interaction
+          
+          sudo chown -R www-data:www-data var/cache/dev/doctrine/orm/Proxies
+          sudo chmod -R 775 var/cache/dev/doctrine/orm/Proxies
+          
+          sudo systemctl restart nginx
+          EOF
