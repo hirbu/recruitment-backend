@@ -22,30 +22,31 @@ jobs:
       - name: Run deployment commands
         run: |
           ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
-          
-          sudo chown -R www-data:www-data /var/www/recruitment-backend
-          sudo find /var/www/recruitment-backend -type d -exec chmod 755 {} \;
-          sudo find /var/www/recruitment-backend -type f -exec chmod 644 {} \;
-          
+
           cd /var/www/recruitment-backend
-          
+
           git config --global --add safe.directory /var/www/recruitment-backend
           git fetch origin
           git reset --hard origin/master
-          
+
           composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
-          
-          mkdir -p var/cache var/log public/uploads/resumes
-          find var/cache var/log -type d -exec chmod 775 {} \;
-          find var/cache var/log -type f -exec chmod 664 {} \;
-          chmod -R 775 public/uploads
-          
-          sudo -u www-data php bin/console cache:clear
-          sudo -u www-data php bin/console cache:warmup
-          sudo -u www-data php bin/console doctrine:migrations:migrate --no-interaction
-          
-          sudo chown -R www-data:www-data var/cache/dev/doctrine/orm/Proxies
-          sudo chmod -R 775 var/cache/dev/doctrine/orm/Proxies
-          
+
+          mkdir -p var var/cache var/log public/uploads/resumes
+
+          find . -type f -exec chmod 644 {} \;
+          find . -type d -exec chmod 755 {} \;
+
+          chmod 755 bin/console
+
+          HTTPDUSER="www-data"
+
+          setfacl -dR -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX var
+          setfacl -R -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX var
+
+          setfacl -dR -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX public/uploads/resumes
+          setfacl -R -m u:"$HTTPDUSER":rwX -m u:$(whoami):rwX public/uploads/resumes
+
+          php bin/console cache:warmup --env=prod
+
           sudo systemctl restart nginx
           EOF
