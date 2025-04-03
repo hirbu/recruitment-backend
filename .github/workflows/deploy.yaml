@@ -23,15 +23,18 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
 
-          cd /var/www/recruitment-backend
+          mkdir -p /var/www/recruitment-backend
 
+          cd /var/www/recruitment-backend
+          
+          git clone https://github.com/hirbu/recruitment-backend.git .
           git config --global --add safe.directory /var/www/recruitment-backend
           git fetch origin
           git reset --hard origin/master
 
           composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
-          mkdir -p var var/cache var/log public/uploads/resumes
+          mkdir -p var/cache var/log public/uploads/resumes
 
           find . -type f -exec chmod 644 {} \;
           find . -type d -exec chmod 755 {} \;
