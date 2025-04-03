@@ -59,7 +59,4 @@ jobs:
         # Ensure cache and logs are writable
         sudo chown -R www-data:www-data /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
         sudo chmod -R 775 /var/www/recruitment-backend/var/cache /var/www/recruitment-backend/var/log
-        
-        # Restart workers
-        sudo systemctl --user restart messenger-consume.service
         EOF
